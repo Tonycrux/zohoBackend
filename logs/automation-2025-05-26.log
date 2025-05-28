@@ -1,0 +1,24 @@
+{"count":5,"level":"info","message":"Ticket batch started","timestamp":"2025-05-26 15:46:19"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396400","timestamp":"2025-05-26 15:46:21"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000396400","timestamp":"2025-05-26 15:46:25"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396302","timestamp":"2025-05-26 15:46:25"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000396302","timestamp":"2025-05-26 15:46:27"}
+{"level":"info","message":"Processing ticket","subject":"Data not added","ticketId":"1145249000000364002","timestamp":"2025-05-26 15:46:27"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000364002","timestamp":"2025-05-26 15:46:29"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000400002","timestamp":"2025-05-26 15:46:29"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000400002","timestamp":"2025-05-26 15:46:31"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000365177","timestamp":"2025-05-26 15:46:31"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000365177","timestamp":"2025-05-26 15:46:33"}
+{"level":"info","message":"✅ Batch complete","processed":5,"timestamp":"2025-05-26 15:46:33"}
+{"count":5,"level":"info","message":"Ticket batch started","timestamp":"2025-05-26 15:48:07"}
+{"level":"info","message":"Processing ticket","subject":"Internet is down again","ticketId":"1145249000000414002","timestamp":"2025-05-26 15:48:09"}
+{"level":"info","message":"Replied & closed","sentiment":"Negative","ticketId":"1145249000000414002","timestamp":"2025-05-26 15:48:14"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396400","timestamp":"2025-05-26 15:48:14"}
+{"error":"Request failed with status code 400","level":"error","message":"Ticket processing error","ticketId":"1145249000000396400","timestamp":"2025-05-26 15:48:14"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396302","timestamp":"2025-05-26 15:48:14"}
+{"error":"Request failed with status code 400","level":"error","message":"Ticket processing error","ticketId":"1145249000000396302","timestamp":"2025-05-26 15:48:14"}
+{"level":"info","message":"Processing ticket","subject":"Data not added","ticketId":"1145249000000364002","timestamp":"2025-05-26 15:48:14"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000364002","timestamp":"2025-05-26 15:48:17"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000400002","timestamp":"2025-05-26 15:48:17"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000400002","timestamp":"2025-05-26 15:48:19"}
+{"level":"info","message":"✅ Batch complete","processed":5,"timestamp":"2025-05-26 15:48:19"}

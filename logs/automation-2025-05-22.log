@@ -1,0 +1,24 @@
+{"count":10,"level":"info","message":"Ticket batch started","timestamp":"2025-05-22 15:30:42"}
+{"error":"Request failed with status code 401","level":"error","message":"Fatal controller error","timestamp":"2025-05-22 15:30:44"}
+{"count":10,"level":"info","message":"Ticket batch started","timestamp":"2025-05-22 16:07:29"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396400","timestamp":"2025-05-22 16:07:30"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000396400","timestamp":"2025-05-22 16:07:32"}
+{"level":"info","message":"Processing ticket","subject":"Data Credit Not Applied","ticketId":"1145249000000396302","timestamp":"2025-05-22 16:07:32"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000396302","timestamp":"2025-05-22 16:07:33"}
+{"level":"info","message":"Processing ticket","subject":"Data not added","ticketId":"1145249000000364002","timestamp":"2025-05-22 16:07:33"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000364002","timestamp":"2025-05-22 16:07:35"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000400002","timestamp":"2025-05-22 16:07:35"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000400002","timestamp":"2025-05-22 16:07:36"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000365177","timestamp":"2025-05-22 16:07:36"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000365177","timestamp":"2025-05-22 16:07:38"}
+{"level":"info","message":"Processing ticket","subject":"Error in Data","ticketId":"1145249000000396202","timestamp":"2025-05-22 16:07:38"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000396202","timestamp":"2025-05-22 16:07:39"}
+{"level":"info","message":"Processing ticket","subject":"Data not credited to my account","ticketId":"1145249000000398099","timestamp":"2025-05-22 16:07:39"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000398099","timestamp":"2025-05-22 16:07:41"}
+{"level":"info","message":"Processing ticket","subject":"Incorrect data on my account","ticketId":"1145249000000399099","timestamp":"2025-05-22 16:07:41"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000399099","timestamp":"2025-05-22 16:07:42"}
+{"level":"info","message":"Processing ticket","subject":"Data not added to my account","ticketId":"1145249000000397100","timestamp":"2025-05-22 16:07:42"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000397100","timestamp":"2025-05-22 16:07:44"}
+{"level":"info","message":"Processing ticket","subject":"Bonus not added to my account","ticketId":"1145249000000399001","timestamp":"2025-05-22 16:07:44"}
+{"level":"warn","message":"AI decided to Skip","ticketId":"1145249000000399001","timestamp":"2025-05-22 16:07:45"}
+{"level":"info","message":"✅ Batch complete","processed":10,"timestamp":"2025-05-22 16:07:45"}
