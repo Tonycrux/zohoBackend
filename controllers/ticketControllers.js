@@ -1,7 +1,7 @@
 
 const { getOpenTickets, getLastTwoMessages, sendReplyAndClose, getAllTeams, getLastMessage, detectAndCloseDuplicateTickets } = require("../services/zohoService");
 const { analyzeMessages, classifyDepartment } = require("../services/aiService");
-const log = require("../utils/logger");
+//const log = require("../utils/logger");
 const { getAccessToken } = require("../zoho/auth1");
 const axios = require("axios");
 
@@ -36,20 +36,20 @@ exports.getTicketThreadsPreview = async (req, res) => {
 exports.processOpenTickets = async (req, res) => {
   try {
     const count   = parseInt(req.query.count || "10");
-    log.info("Ticket batch started", { count });
+    // log.info("Ticket batch started", { count });
 
     const tickets = await getOpenTickets(count);
     const results = [];
 
     for (const ticket of tickets) {
-      log.info("Processing ticket", { ticketId: ticket.id, subject: ticket.subject });
+      //log.info("Processing ticket", { ticketId: ticket.id, subject: ticket.subject });
 
       try {
         const messages = await getLastTwoMessages(ticket.id);
 
         // Skip if any attachment
         if (messages.some(m => m.hasAttach)) {
-          log.warn("📎 Attachment detected – skipping", { ticketId: ticket.id });
+          //log.warn("📎 Attachment detected – skipping", { ticketId: ticket.id });
           results.push({
             ticketId : ticket.id,
             subject  : ticket.subject,
@@ -71,10 +71,10 @@ exports.processOpenTickets = async (req, res) => {
           try {
             await sendReplyAndClose(ticket.id, analysis.reply, ticket.email);
 
-            log.info("Replied & closed", {
-              ticketId : ticket.id,
-              sentiment: analysis.sentiment
-            });
+            // log.info("Replied & closed", {
+            //   ticketId : ticket.id,
+            //   sentiment: analysis.sentiment
+            // });
 
             results.push({
               ticketId : ticket.id,
@@ -86,10 +86,10 @@ exports.processOpenTickets = async (req, res) => {
               reply    : analysis.reply
             });
           } catch (apiErr) {
-            log.error("Zoho sendReply error", {
-              ticketId : ticket.id,
-              error    : apiErr.message
-            });
+            // log.error("Zoho sendReply error", {
+            //   ticketId : ticket.id,
+            //   error    : apiErr.message
+            // });
 
             results.push({
               ticketId : ticket.id,
@@ -104,7 +104,7 @@ exports.processOpenTickets = async (req, res) => {
           }
         } else {
           // Decision = Skip by AI
-          log.warn("AI decided to Skip", { ticketId: ticket.id });
+         // log.warn("AI decided to Skip", { ticketId: ticket.id });
 
           results.push({
             ticketId : ticket.id,
@@ -117,7 +117,7 @@ exports.processOpenTickets = async (req, res) => {
           });
         }
       } catch (err) {
-        log.error("Ticket processing error", { ticketId: ticket.id, error: err.message });
+        //log.error("Ticket processing error", { ticketId: ticket.id, error: err.message });
 
         results.push({
           ticketId : ticket.id,
@@ -132,10 +132,10 @@ exports.processOpenTickets = async (req, res) => {
       }
     }
 
-    log.info("Batch complete", { processed: results.length });
+    //log.info("Batch complete", { processed: results.length });
     res.json({ success: true, processed: results });
   } catch (err) {
-    log.error("Fatal controller error", { error: err.message });
+   // log.error("Fatal controller error", { error: err.message });
     res.status(500).json({ success: false, message: "Unhandled error", error: err.message });
   }
 };
@@ -146,7 +146,7 @@ exports.getAllTeams = async (req, res) => {
     const teams = await getAllTeams();
     res.json({ success: true, data: teams });
   } catch (err) {
-    log.error("Failed to fetch teams", { error: err.message });
+   // log.error("Failed to fetch teams", { error: err.message });
     res.status(500).json({ success: false, message: err.message });
   }
 }
@@ -197,7 +197,7 @@ exports.autoAssignTicket = async (req, res) => {
     tickets = (resp.data.data || []).filter(t => !t.assigneeId);
     console.log(`🎯 Fetched ${tickets.length} unassigned open tickets`);
   } catch (err) {
-    log.error(err);
+    //log.error(err);
     return res.status(500).json({ success: false, message: "Failed to fetch tickets." });
   }
 
@@ -215,7 +215,7 @@ exports.autoAssignTicket = async (req, res) => {
       console.log("here is the respose here", team);
       console.log(`🔍 Ticket ${t.id} classified as:`, team);
       if (!team || team === "unknown" || (!TEAM_IDS[team] && team !== "customer service" && team !== "hotspot and fibre")) {
-        log.warn("Skipping unclassified ticket", { ticketId: t.id });
+        //log.warn("Skipping unclassified ticket", { ticketId: t.id });
         results.push({
           ticketId: t.id,
           subject,
@@ -251,7 +251,7 @@ exports.autoAssignTicket = async (req, res) => {
       if (LIVE_MODE) {
         await axios.post(`https://desk.zoho.com/api/v1/tickets/${t.id}/threads`, replyPayload, { headers });
         await axios.put(`https://desk.zoho.com/api/v1/tickets/${t.id}`, assignPayload, { headers });
-        log.info("Assigned ticket", { ticketId: t.id, to: team });
+        //log.info("Assigned ticket", { ticketId: t.id, to: team });
         results.push({
           ticketId: t.id,
           subject,
@@ -272,7 +272,7 @@ exports.autoAssignTicket = async (req, res) => {
       }
 
     } catch (err) {
-      log.error("Error processing ticket", { ticketId: t.id, err: err.message });
+      //log.error("Error processing ticket", { ticketId: t.id, err: err.message });
       results.push({
         ticketId: t.id,
         subject: t.subject,

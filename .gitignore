@@ -2,3 +2,5 @@
 /package-lock.json
 .env1
 .env
+/logs
+/utils/logger.js
