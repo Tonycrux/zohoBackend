@@ -1,6 +1,8 @@
 const axios = require("axios");
 const { getAccessToken } = require("../zoho/auth1");
-require("dotenv").config();
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 const cleanRawEmail = require("../utils/cleanEmail");
 const { default: pLimit } = require("p-limit");
 

@@ -1,7 +1,9 @@
 const axios = require("axios");
 const fs    = require("fs");
 const path  = require("path");
-require("dotenv").config();
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 const LIFESPAN = 3600;                          // 1 hour
 const TOKEN_URL = `${process.env.ACCOUNTS_URL}/oauth/v2/token`;
