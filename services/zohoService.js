@@ -4,7 +4,7 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 const cleanRawEmail = require("../utils/cleanEmail");
-const { default: pLimit } = require("p-limit");
+const pLimit = require("p-limit");
 
 const API_BASE = "https://desk.zoho.com/api/v1";
 
