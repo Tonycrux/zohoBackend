@@ -14,9 +14,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.options("*", (req, res) => {
-  res.sendStatus(204);
-});
 
 // Routers
 const ticketRoutes = require("./routers/ticketRouters");
