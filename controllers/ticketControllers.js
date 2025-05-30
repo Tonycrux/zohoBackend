@@ -1,5 +1,5 @@
 
-const { getOpenTickets, getLastTwoMessages, sendReplyAndClose, getAllTeams, getLastMessage, detectAndCloseDuplicateTickets } = require("../services/zohoService");
+const { getAllOpenTickets, getLastTwoMessages, sendReplyAndClose, getLastMessage, detectAndCloseDuplicateTickets } = require("../services/zohoService");
 const { analyzeMessages, classifyDepartment } = require("../services/aiService");
 //const log = require("../utils/logger");
 const { getAccessToken } = require("../zoho/auth1");
@@ -10,10 +10,10 @@ const axios = require("axios");
 
 
 
-exports.getOpenTicketsLimited = async (req, res) => {
+exports.getOpenTickets = async (req, res) => {
   const count = parseInt(req.query.count || "10");
   try {
-    const tickets = await getOpenTickets(count);
+    const tickets = await getAllOpenTickets(count);
     res.json({ success: true, data: tickets });
   } catch (err) {
     // console.error("Failed to fetch tickets:", err.message);
@@ -21,28 +21,29 @@ exports.getOpenTicketsLimited = async (req, res) => {
   }
 };
 
-
-exports.getTicketThreadsPreview = async (req, res) => {
-  const { ticketId } = req.params;
-  try {
-    const result = await getLastTwoMessages(ticketId);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-
 exports.processOpenTickets = async (req, res) => {
+  // console.log("Processing open tickets...");
   try {
     const count   = parseInt(req.query.count || "10");
     // log.info("Ticket batch started", { count });
 
-    const tickets = await getOpenTickets(count);
+    const tickets = await getAllOpenTickets(count);
     const results = [];
 
     for (const ticket of tickets) {
       //log.info("Processing ticket", { ticketId: ticket.id, subject: ticket.subject });
+       if (ticket.email.toLowerCase() !== "tmetiko@gmail.com") {
+        results.push({
+          ticketId : ticket.id,
+          subject  : ticket.subject,
+          email    : ticket.email,
+          status   : ticket.status,
+          decision : "Skipped – Not target email",
+          sentiment: "N/A",
+          reply    : ""
+        });
+        continue;
+      }
 
       try {
         const messages = await getLastTwoMessages(ticket.id);
@@ -113,7 +114,8 @@ exports.processOpenTickets = async (req, res) => {
             status   : ticket.status,
             decision : "Skip",
             sentiment: analysis.sentiment,
-            reply    : ""
+            reply    : "",
+            reason   : "AI decided to Skip"
           });
         }
       } catch (err) {
@@ -140,20 +142,9 @@ exports.processOpenTickets = async (req, res) => {
   }
 };
 
-
-exports.getAllTeams = async (req, res) => {
-  try {
-    const teams = await getAllTeams();
-    res.json({ success: true, data: teams });
-  } catch (err) {
-   // log.error("Failed to fetch teams", { error: err.message });
-    res.status(500).json({ success: false, message: err.message });
-  }
-}
-
 let csToggle = 0;
 
-const LIVE_MODE = false; // Set to true for real assignment + reply
+const LIVE_MODE = true; // Set to true for real assignment + reply
 
 const AGENT_IDS = {
   cs: ["988907000000774001", "988907000000772035"],
@@ -162,6 +153,7 @@ const AGENT_IDS = {
   hsAgent: "988907000000777001",
 };
 
+// REAL TEAM IDS
 const TEAM_IDS = {
   "social media": "988907000006857031",
   "bizdev": "988907000006857007",
@@ -172,6 +164,12 @@ const TEAM_IDS = {
   "sales team": "988907000000767478",
   "quality assurance": "988907000000744749",
 };
+
+// TEST DETAILS
+// const TEAM_IDS = {
+//   "account": "1145249000000516001",
+//   "customer service": "1145249000000516015"
+// }
 
 exports.autoAssignTicket = async (req, res) => {
   const count = parseInt(req.query.count || "10");
@@ -195,15 +193,25 @@ exports.autoAssignTicket = async (req, res) => {
       }
     });
     tickets = (resp.data.data || []).filter(t => !t.assigneeId);
-    console.log(`🎯 Fetched ${tickets.length} unassigned open tickets`);
+    // console.log(`🎯 Fetched ${tickets.length} unassigned open tickets`);
   } catch (err) {
     //log.error(err);
     return res.status(500).json({ success: false, message: "Failed to fetch tickets." });
   }
 
   const results = [];
-  console.log(`Found ${tickets.length} unassigned open tickets.`);
+  // console.log(`Found ${tickets.length} unassigned open tickets.`);
   for (const t of tickets) {
+    const email = t?.contact?.email || "";
+    if (email.toLowerCase() !== "tmetiko@gmail.com"){
+      results.push({
+        ticketId: t.id,
+        subject : t.subject,
+        email,
+        decision: "Skipped: Not target email"
+      });
+      continue;
+    }
     try {
       const subject = t.subject || "";
       const message = await getLastMessage(t.id);
@@ -212,8 +220,8 @@ exports.autoAssignTicket = async (req, res) => {
       const team = resteam?.toLowerCase()
 
       //const dept = ai.department?.toLowerCase();
-      console.log("here is the respose here", team);
-      console.log(`🔍 Ticket ${t.id} classified as:`, team);
+      // console.log("here is the respose here", team);
+      // console.log(`🔍 Ticket ${t.id} classified as:`, team);
       if (!team || team === "unknown" || (!TEAM_IDS[team] && team !== "customer service" && team !== "hotspot and fibre")) {
         //log.warn("Skipping unclassified ticket", { ticketId: t.id });
         results.push({
@@ -231,26 +239,28 @@ exports.autoAssignTicket = async (req, res) => {
         content: `Thank you for reaching out. We have forwarded your message to the appropriate department.\n\nRegards,\nTizeti Support`,
         channel: "EMAIL",
         contentType: "plainText",
-        direction: "out",
-        sendImmediately: true
+        fromEmailAddress: process.env.FROM_EMAIL,
+        to: t.contact.email,
+        direction: "out"
       };
 
       const assignPayload = {};
 
       if (team === "customer service") {
         const agent = AGENT_IDS.cs[csToggle++ % 2];
-        assignPayload.departmentId = AGENT_IDS.csDept;
+        assignPayload.teamId = AGENT_IDS.csDept;
         assignPayload.assigneeId = agent;
       } else if (team === "hotspot and fibre") {
-        assignPayload.departmentId = AGENT_IDS.hsDept;
+        assignPayload.teamId = AGENT_IDS.hsDept;
         assignPayload.assigneeId = AGENT_IDS.hsAgent;
       } else {
-        assignPayload.departmentId = TEAM_IDS[team];
+        assignPayload.teamId = TEAM_IDS[team];
       }
 
       if (LIVE_MODE) {
-        await axios.post(`https://desk.zoho.com/api/v1/tickets/${t.id}/threads`, replyPayload, { headers });
-        await axios.put(`https://desk.zoho.com/api/v1/tickets/${t.id}`, assignPayload, { headers });
+        await axios.patch(`https://desk.zoho.com/api/v1/tickets/${t.id}`, assignPayload, { headers });
+        await axios.post(`https://desk.zoho.com/api/v1/tickets/${t.id}/sendReply`, replyPayload, { headers });
+        
         //log.info("Assigned ticket", { ticketId: t.id, to: team });
         results.push({
           ticketId: t.id,
@@ -258,6 +268,7 @@ exports.autoAssignTicket = async (req, res) => {
           assignedTo: team,
           status: "Assigned"
         });
+
       } else {
         // Testing mode: log what would happen
         results.push({
@@ -266,13 +277,14 @@ exports.autoAssignTicket = async (req, res) => {
           wouldAssignTo: team,
           message,
           assigneeId: assignPayload.assigneeId || "No assignee coz not CS or HS",
-          teamId: assignPayload.departmentId,
+          teamId: assignPayload.teamId,
           decision: "Test Only"
         });
       }
 
     } catch (err) {
       //log.error("Error processing ticket", { ticketId: t.id, err: err.message });
+      // console.log("Error processing ticket", { ticketId: t.id, err: err.message });
       results.push({
         ticketId: t.id,
         subject: t.subject,
@@ -295,10 +307,14 @@ exports.checkDuplicates = async (req, res) => {
 
     const { all, headers } = await detectAndCloseDuplicateTickets(timeInSeconds);
 
+    // Send to only a target email
+    const targetEmail = "tmetiko@gmail.com";
+    const filteredTickets = all.filter(ticket => ticket.email.toLowerCase() === targetEmail.toLowerCase());
+
     // Step 1: Group by unique key (subject + email + content)
     const grouped = new Map();
 
-    for (const ticket of all) {
+    for (const ticket of filteredTickets) {
       const key = `${ticket.subject}|${ticket.email}|${ticket.content}`;
       if (!grouped.has(key)) {
         grouped.set(key, {
@@ -341,7 +357,7 @@ exports.checkDuplicates = async (req, res) => {
     }
 
     // Step 4: Build time range from all ticket times
-    const allTimes = all.map(d => d.createdTime.getTime());
+    const allTimes = filteredTickets.map(d => d.createdTime.getTime());
     const timeRange = allTimes.length
       ? {
           earliest: new Date(Math.min(...allTimes)).toISOString(),

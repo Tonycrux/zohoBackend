@@ -1,14 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const { getOpenTicketsLimited, getTicketThreadsPreview, processOpenTickets, getAllTeams, autoAssignTicket, checkDuplicates } = require("../controllers/ticketControllers");
+const { getOpenTickets, processOpenTickets, autoAssignTicket, checkDuplicates } = require("../controllers/ticketControllers");
 
 
-router.get("/open-tickets", getOpenTicketsLimited);
-router.get("/tickets/:ticketId/threads-preview", getTicketThreadsPreview);
-router.get("/tickets/process", processOpenTickets);
-router.get("/teams", getAllTeams);
-router.get("/auto-assign", autoAssignTicket)
-router.get("/check-duplicates", checkDuplicates);
+router.get("/tickets", getOpenTickets);
+router.get("/tickets/autoreply", processOpenTickets);
+router.get("/tickets/autoassign", autoAssignTicket)
+router.get("/tickets/checkduplicates", checkDuplicates);
 
 
 module.exports = router;

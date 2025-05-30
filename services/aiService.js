@@ -83,7 +83,7 @@ If unsure, return "Unknown"
   //console.log(result);
   const text = (await result.response.text()).trim();
   //console.log(text);
-  console.log("Classified department:", text);
+  //console.log("Classified department:", text);
   try {
     return text;
   } catch {

@@ -8,117 +8,9 @@ const pLimit = require("p-limit");
 
 const API_BASE = "https://desk.zoho.com/api/v1";
 
-exports.getAllTicketsFromZoho = async () => {
+exports.getAllOpenTickets = async (count = 10) => {
   const token = await getAccessToken();
-  console.log("🔑 Using access token:", token);
-  const response = await axios.get(`${API_BASE}/tickets`, {
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      orgId: process.env.ORG_ID,
-    },
-    params: {
-      include: "contacts",
-    },
-  });
-
-  const rawTickets = response.data.data;
-
-  const simplifiedTickets = rawTickets.map(ticket => ({
-     id: ticket.id,
-    subject: ticket.subject,
-    status: ticket.status,
-    email: ticket.email || ticket.contact?.email || "N/A",
-    webUrl: ticket.webUrl,
-    // DepartmentId: ticket.departmentIds,
-    TeamId: "N/A",
-  }));
-
-  return simplifiedTickets;
-};
-
-
-
-exports.getFilteredTickets = async (status, limit, page) => {
-  const token = await getAccessToken();
-
-  const res = await axios.get(`${API_BASE}/tickets`, {
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      orgId: process.env.ORG_ID,
-    },
-    params: {
-      include: "contacts",
-      limit: parseInt(limit),
-      from: (page - 1) * limit,
-      ...(status && { status })
-    }
-  });
-
-  const rawTickets = res.data.data;
-
-  return rawTickets.map(ticket => ({
-    id: ticket.id,
-    subject: ticket.subject,
-    status: ticket.status,
-    email: ticket.email || ticket.contact?.email || "N/A",
-    webUrl: ticket.webUrl
-  }));
-};
-
-
-
-exports.getTicketWithThreads = async (ticketId) => {
-  const token = await getAccessToken();
-
-  const headers = {
-    Authorization: `Zoho-oauthtoken ${token}`,
-    orgId: process.env.ORG_ID,
-  };
-
-  // Step 1: Fetch ticket metadata
-  const ticketRes = await axios.get(`${API_BASE}/tickets/${ticketId}`, { headers });
-
-  // Step 2: Fetch thread list
-  const threadsListRes = await axios.get(`${API_BASE}/tickets/${ticketId}/threads`, { headers });
-
-  const threadSummaries = threadsListRes.data.data;
-
-  // Step 3: For each thread, get full content by threadId
-  const fullThreads = await Promise.all(
-  threadSummaries.map(async (thread) => {
-    try {
-      const threadDetailRes = await axios.get(
-        `${API_BASE}/tickets/${ticketId}/threads/${thread.id}`,
-        { headers }
-      );
-
-      const fullContent = threadDetailRes.data.content;
-
-      return {
-        id: thread.id,
-        direction: thread.direction,
-        isPublic: thread.isPublic,
-        createdTime: thread.createdTime,
-        from: thread.fromEmailAddress,
-        to: thread.to,
-        channel: thread.channel,
-        content: fullContent || thread.summary || "[No content]"
-      };
-    } catch (err) {
-      console.warn(`⚠️ Failed to fetch thread ${thread.id}`, err.message);
-      return null;
-    }
-  })
-);
-
-};
-
-
-
-
-exports.getOpenTickets = async (count = 10) => {
-  const token = await getAccessToken();
-  console.log("🔑 Using access token:", token);
+  // console.log("🔑 Using access token:", token);
   const res = await axios.get(`${API_BASE}/tickets`, {
     headers: {
       Authorization: `Zoho-oauthtoken ${token}`,
@@ -260,61 +152,18 @@ exports.sendReplyAndClose = async (ticketId, replyText, customerEmail) => {
     "Content-Type": "application/json"
   };
 
-  console.log("📤 POST /tickets/%s/sendReply", ticketId);
-  console.log("🧾 Payload:", JSON.stringify(payload, null, 2));
+  //  console.log("📤 POST /tickets/%s/sendReply", ticketId);
+  // console.log("🧾 Payload:", JSON.stringify(payload, null, 2));
 
   try {
     await axios.post(`${API_BASE}/tickets/${ticketId}/sendReply`, payload, { headers });
     return true;
   } catch (err) {
     /* Log full Zoho error payload */
-    if (err.response) {
-      console.error("Zoho 422 detail:", err.response.data);
-    }
+    // if (err.response) {
+    //   console.error("Zoho 422 detail:", err.response.data);
+    // }
     throw err;   // bubble up so controller records "Error"
-  }
-};
-
-
-
-exports.getAllTeams = async () => {
-  const token = await getAccessToken();
-  const res = await axios.get(`${API_BASE}/teams`, {
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      orgId: process.env.ORG_ID,
-    }
-  });
-
-  return res.data.data.map(team => ({
-    id: team.id,
-    name: team.name,
-    description: team.description || "No description"
-  }));
-}
-
-
-exports.getOriginalEmailContent = async (ticketId, threadId) => {
-  const token = await getAccessToken();
-  const headers = {
-    Authorization: `Zoho-oauthtoken ${token}`,
-    orgId: process.env.ORG_ID,
-  };
-
-  try {
-    const res = await axios.get(
-      `https://desk.zoho.com/api/v1/tickets/${ticketId}/threads/${threadId}/originalContent`,
-      { headers }
-    );
-
-    const full = res.data.content || "";
-    // Strip out headers + HTML
-    const plain = cleanRawEmail(full);
-
-    return plain || "[no clean content]";
-  } catch (err) {
-    console.warn(`⚠️ Failed to fetch original content for ${ticketId}/${threadId}`, err.message);
-    return "[failed to retrieve content]";
   }
 };
 
