@@ -32,18 +32,18 @@ exports.processOpenTickets = async (req, res) => {
 
     for (const ticket of tickets) {
       //log.info("Processing ticket", { ticketId: ticket.id, subject: ticket.subject });
-       if (ticket.email.toLowerCase() !== "tmetiko@gmail.com") {
-        results.push({
-          ticketId : ticket.id,
-          subject  : ticket.subject,
-          email    : ticket.email,
-          status   : ticket.status,
-          decision : "Skipped – Not target email",
-          sentiment: "N/A",
-          reply    : ""
-        });
-        continue;
-      }
+      //  if (ticket.email.toLowerCase() !== "tmetiko@gmail.com") {
+      //   results.push({
+      //     ticketId : ticket.id,
+      //     subject  : ticket.subject,
+      //     email    : ticket.email,
+      //     status   : ticket.status,
+      //     decision : "Skipped – Not target email",
+      //     sentiment: "N/A",
+      //     reply    : ""
+      //   });
+      //   continue;
+      // }
 
       try {
         const messages = await getLastTwoMessages(ticket.id);
@@ -144,7 +144,7 @@ exports.processOpenTickets = async (req, res) => {
 
 let csToggle = 0;
 
-const LIVE_MODE = true; // Set to true for real assignment + reply
+const LIVE_MODE = true; 
 
 const AGENT_IDS = {
   cs: ["988907000000774001", "988907000000772035"],
@@ -202,16 +202,16 @@ exports.autoAssignTicket = async (req, res) => {
   const results = [];
   // console.log(`Found ${tickets.length} unassigned open tickets.`);
   for (const t of tickets) {
-    const email = t?.contact?.email || "";
-    if (email.toLowerCase() !== "tmetiko@gmail.com"){
-      results.push({
-        ticketId: t.id,
-        subject : t.subject,
-        email,
-        decision: "Skipped: Not target email"
-      });
-      continue;
-    }
+    // const email = t?.contact?.email || "";
+    // if (email.toLowerCase() !== "tmetiko@gmail.com"){
+    //   results.push({
+    //     ticketId: t.id,
+    //     subject : t.subject,
+    //     email,
+    //     decision: "Skipped: Not target email"
+    //   });
+    //   continue;
+    // }
     try {
       const subject = t.subject || "";
       const message = await getLastMessage(t.id);
@@ -308,13 +308,13 @@ exports.checkDuplicates = async (req, res) => {
     const { all, headers } = await detectAndCloseDuplicateTickets(timeInSeconds);
 
     // Send to only a target email
-    const targetEmail = "tmetiko@gmail.com";
-    const filteredTickets = all.filter(ticket => ticket.email.toLowerCase() === targetEmail.toLowerCase());
+    // const targetEmail = "tmetiko@gmail.com";
+    // const filteredTickets = all.filter(ticket => ticket.email.toLowerCase() === targetEmail.toLowerCase());
 
     // Step 1: Group by unique key (subject + email + content)
     const grouped = new Map();
 
-    for (const ticket of filteredTickets) {
+    for (const ticket of all) {
       const key = `${ticket.subject}|${ticket.email}|${ticket.content}`;
       if (!grouped.has(key)) {
         grouped.set(key, {
@@ -357,7 +357,7 @@ exports.checkDuplicates = async (req, res) => {
     }
 
     // Step 4: Build time range from all ticket times
-    const allTimes = filteredTickets.map(d => d.createdTime.getTime());
+    const allTimes = all.map(d => d.createdTime.getTime());
     const timeRange = allTimes.length
       ? {
           earliest: new Date(Math.min(...allTimes)).toISOString(),
@@ -381,6 +381,98 @@ exports.checkDuplicates = async (req, res) => {
 
   } catch (err) {
     console.error("Duplicate check error:", err);
+    res.status(500).json({ success: false, message: "Internal error", error: err.message });
+  }
+};
+
+
+
+exports.checkDuplicatesByTeam = async (req, res) => {
+  try {
+    const timeInSeconds = parseInt(req.query.time);
+    const team = req.query.team?.toLowerCase();
+
+    if (isNaN(timeInSeconds)) {
+      return res.status(400).json({ success: false, message: "Invalid time parameter" });
+    }
+
+    if (!team || !TEAM_IDS[team]) {
+      return res.status(400).json({ success: false, message: "Invalid or missing team" });
+    }
+
+    const teamId = TEAM_IDS[team];
+    console.log("TeamId is: ", teamId);
+    const { all, headers } = await detectAndCloseDuplicateTickets([teamId], timeInSeconds );
+
+    // Step 1: Group by unique key (subject + email + content)
+    const grouped = new Map();
+    for (const ticket of all) {
+      const key = `${ticket.subject}|${ticket.email}|${ticket.content}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          subject: ticket.subject,
+          email: ticket.email,
+          all: [],
+        });
+      }
+      grouped.get(key).all.push(ticket);
+    }
+
+    // Step 2: Process each group into original + duplicates
+    const groupedDuplicates = [];
+    for (const [_, group] of grouped.entries()) {
+      const sorted = group.all.sort((a, b) => a.createdTime - b.createdTime);
+      const original = sorted[0];
+      const dupsOnly = sorted.slice(1); // exclude the original
+
+      if (dupsOnly.length > 0) {
+        groupedDuplicates.push({
+          subject: group.subject,
+          email: group.email,
+          originalTicketId: original.id,
+          originalCreatedTime: original.createdTime,
+          duplicates: dupsOnly.map(d => ({
+            id: d.id,
+            createdTime: d.createdTime,
+          })),
+          duplicateCount: dupsOnly.length
+        });
+
+        if (LIVE_MODE) {
+          for (const dup of dupsOnly) {
+            await axios.patch(`https://desk.zoho.com/api/v1/tickets/${dup.id}`, { status: "Closed" }, { headers });
+          }
+        }
+      }
+    }
+
+    // Step 3: Build time range from all ticket times
+    const allTimes = all.map(d => d.createdTime.getTime());
+    const timeRange = allTimes.length
+      ? {
+          earliest: new Date(Math.min(...allTimes)).toISOString(),
+          latest: new Date(Math.max(...allTimes)).toISOString()
+        }
+      : { earliest: null, latest: null };
+
+    // Step 4: Build final result
+    const result = {
+      success: true,
+      team,
+      teamId,
+      mode: LIVE_MODE ? "live" : "test",
+      totalDuplicateTickets: groupedDuplicates.reduce((sum, g) => sum + g.duplicateCount, 0),
+      duplicatesTimeRange: timeRange,
+      groupedDuplicates,
+      closed: LIVE_MODE
+        ? groupedDuplicates.flatMap(g => g.duplicates.map(d => d.id))
+        : []
+    };
+
+    return res.json(result);
+
+  } catch (err) {
+    console.error("checkDuplicatesByTeam error:", err);
     res.status(500).json({ success: false, message: "Internal error", error: err.message });
   }
 };

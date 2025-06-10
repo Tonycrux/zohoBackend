@@ -61,19 +61,22 @@ exports.classifyDepartment = async (subject, message) => {
 You are a strict classifier. Choose exactly one of the departments / teams below
 or output "Unknown" if unsure. RETURN ONLY THE NAME.
 Departments / Teams (with duties):
-• Customer Service – general customer queries, subscription questions, password resets, downtime issues, relocation
+•  Customer Service – general customer queries, subscription questions, password resets, login/signup issues, downtime issues, anything related to user accounts or access
 • Hotspot and Fibre – hotspot portal issues, fibre-install complaints, Anything relating to fiber
 • Social media – Twitter / Facebook / Instagram complaints, public mentions
 • bizdev – partnership proposals, B2B collaboration, vendor outreach
 • NOC Team – network outages, latency, routing, equipment down (Network Operations Center)
-• Account – billing discrepancies, invoices, refunds, payment failures, payments
+• Account – billing discrepancies, invoices, refunds, payment failures, payments and activation (strictly billing-related issues only)
 • Field Service – on-site repairs, antenna alignment, FSE dispatch
-• Retention Team – cancellation threats, churn prevention, downgrades
-• Sales Team – new service inquiries, quotes, plan upgrades
+• Retention Team – cancellation threats, churn prevention, downgrades, awaiting activation, frequent downtime, no response, delayed response, compensation, No Line of Sight, bad device, customers not interested anymore, wrong details for existing customers, transfer of ownership
+• Sales Team – new service inquiries, quotes, plan upgrades, relocation, awaiting installation, installation refund
 • Quality Assurance – service quality audits, internal process feedback, QA reports
 
 Subject: ${subject}
 Description: ${message}
+
+IMPORTANT: If "account" refers to billing/payments, classify as "Account".
+If "account" refers to signup/login/access, classify as "Customer Service".
 
 Respond with the exact department/team name above, or "Unknown".
 If unsure, return "Unknown"

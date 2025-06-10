@@ -169,20 +169,25 @@ exports.sendReplyAndClose = async (ticketId, replyText, customerEmail) => {
 
 
 
-exports.detectAndCloseDuplicateTickets = async (timeInSeconds) => {
+exports.detectAndCloseDuplicateTickets = async (teamIds = [], timeInSeconds) => {
   const token = await getAccessToken();
   const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
     orgId: process.env.ORG_ID,
   };
+  const params = {
+    status: "Open",
+    include: "contacts,assignee",
+    // limit: 100,
+  };
+
+  if (teamIds.length > 0) {
+    params.teamIds = teamIds.join(","); // Join for API format
+  }
 
   const res = await axios.get(`${API_BASE}/tickets`, {
     headers,
-    params: {
-      status: "Open",
-      include: "contacts,assignee",
-      limit: 100,
-    },
+    params,
   });
 
   const tickets = res.data.data;
@@ -207,19 +212,43 @@ exports.detectAndCloseDuplicateTickets = async (timeInSeconds) => {
 
   enriched.sort((a, b) => a.createdTime - b.createdTime);
 
-  const seen = new Map();
+  const seenFull = new Map(); // for subject + email + content
+  const seenLoose = new Map(); // for email + content
   const duplicates = [];
   const originals = [];
 
   for (const ticket of enriched) {
-    const key = `${ticket.subject}|${ticket.email}|${ticket.content}`;
-    if (seen.has(key)) {
+    const fullKey = `${ticket.subject}|${ticket.email}|${ticket.content}`;
+    const looseKey = `${ticket.email}|${ticket.content}`;
+
+    if (seenFull.has(fullKey)) {
+      duplicates.push(ticket);
+    } else if (seenLoose.has(looseKey)) {
+      // Already seen same email + content but different subject — still a duplicate
       duplicates.push(ticket);
     } else {
-      seen.set(key, ticket);
+      // First time seeing this ticket
+      seenFull.set(fullKey, ticket);
+      seenLoose.set(looseKey, ticket);
       originals.push(ticket);
     }
   }
+
+  // enriched.sort((a, b) => a.createdTime - b.createdTime);
+
+  // const seen = new Map();
+  // const duplicates = [];
+  // const originals = [];
+
+  // for (const ticket of enriched) {
+  //   const key = `${ticket.subject}|${ticket.email}|${ticket.content}`;
+  //   if (seen.has(key)) {
+  //     duplicates.push(ticket);
+  //   } else {
+  //     seen.set(key, ticket);
+  //     originals.push(ticket);
+  //   }
+  // }
 
   return {
     duplicates,
