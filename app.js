@@ -21,4 +21,4 @@ app.get("/", (req, res) => res.send("Zoho Desk API Backend"));
 //   console.log(`Server running on http://localhost:${port}`);
 // });
 
-module.exports = app; 
+module.exports = app; // <-- export the app

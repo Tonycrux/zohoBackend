@@ -401,7 +401,7 @@ exports.checkDuplicatesByTeam = async (req, res) => {
     }
 
     const teamId = TEAM_IDS[team];
-    console.log("TeamId is: ", teamId);
+    // console.log("TeamId is: ", teamId);
     const { all, headers } = await detectAndCloseDuplicateTickets([teamId], timeInSeconds );
 
     // Step 1: Group by unique key (subject + email + content)
@@ -541,7 +541,7 @@ exports.getAllDuplicates = async (req, res) => {
     }
 
     const teamId = TEAM_IDS[team];
-    console.log("TeamId is: ", teamId);
+    // console.log("TeamId is: ", teamId);
 
     const { duplicateGroups } = await getAllDuplicatesWithDetails([teamId]);
 
@@ -591,53 +591,53 @@ exports.getAllDuplicates = async (req, res) => {
 
 exports.closeSelectedTickets = async (req, res) => {
   try {
-    const { ticketIds } = req.body;
+    const { tickets } = req.body;
 
-    if (!Array.isArray(ticketIds) || ticketIds.length === 0) {
+    if (!Array.isArray(tickets) || tickets.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "ticketIds must be a non-empty array"
+        message: "`tickets` must be a non-empty array"
       });
     }
 
-    const invalidIds = ticketIds.filter(id => !id || (typeof id !== 'string' && typeof id !== 'number'));
-    if (invalidIds.length > 0) {
+    const invalid = tickets.find(t =>
+      !t.originalTicketId ||
+      typeof t.originalTicketId !== 'string' ||
+      !Array.isArray(t.duplicateTicketIds) ||
+      t.duplicateTicketIds.length === 0
+    );
+
+    if (invalid) {
       return res.status(400).json({
         success: false,
-        message: "All ticket IDs must be valid strings or numbers"
+        message: "Each group must have originalTicketId and non-empty duplicateTicketIds"
       });
     }
-
-    console.log(`Received ${ticketIds.length} tickets. LIVE_MODE=${LIVE_MODE}`);
 
     if (!LIVE_MODE) {
       return res.json({
         success: true,
         mode: "dry-run",
-        message: "These tickets would have been closed",
-        tickets: ticketIds
+        message: "Would have added comment and closed duplicates",
+        ticketGroups: tickets
       });
     }
 
-    const { successful, failed, total } = await closeTicketsByIds(ticketIds);
-
-    if (successful.length === 0) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to close any tickets",
-        failed
-      });
-    }
+    const result = await closeTicketsByIds(tickets);
 
     return res.json({
       success: true,
-      message: `Closed ${successful.length} out of ${total} tickets`,
-      closed: successful,
-      ...(failed.length > 0 && { failed })
+      message: `Closed ${result.successful.length} of ${result.total} tickets`,
+      closed: result.successful,
+      ...(result.failed.length > 0 && { failed: result.failed })
     });
 
   } catch (err) {
     console.error("closeSelectedTickets error:", err);
-    res.status(500).json({ success: false, message: "Internal error", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Internal error",
+      error: err.message
+    });
   }
 };

@@ -22,6 +22,7 @@ exports.getAllOpenTickets = async (count = 10) => {
       include: "departments,contacts,team,assignee"
     }
   });
+  // console.log(token)
 
   const rawTickets = res.data.data;
 
@@ -496,7 +497,20 @@ exports.getAllTicketContent = async (ticketId) => {
 };
 
 
-exports.closeTicketsByIds = async (ticketIds) => {
+async function addCommentToTicket(ticketId, comment, headers) {
+  return axios.post(
+    `${API_BASE}/tickets/${ticketId}/comments`,
+    { isPublic: false, content: comment },
+    { headers }
+  );
+}
+
+async function fetchTicketNumber(ticketId, headers) {
+  const res = await axios.get(`${API_BASE}/tickets/${ticketId}`, { headers });
+  return res.data.ticketNumber;
+}
+
+exports.closeTicketsByIds = async (ticketGroups) => {
   const token = await getAccessToken();
   const headers = {
     Authorization: `Zoho-oauthtoken ${token}`,
@@ -504,31 +518,44 @@ exports.closeTicketsByIds = async (ticketIds) => {
   };
 
   const results = {
+    total: 0,
     successful: [],
-    failed: [],
-    total: ticketIds.length
+    failed: []
   };
 
-  const limit = pLimit(5); // Limit concurrent requests
+  const limit = pLimit(5);
 
-  await Promise.all(
-    ticketIds.map(ticketId => limit(async () => {
-      try {
-        await axios.patch(
-          `${API_BASE}/tickets/${ticketId}`,
-          { status: "Closed" },
-          { headers }
-        );
-        results.successful.push(ticketId);
-      } catch (error) {
-        console.error(`Failed to close ticket ${ticketId}:`, error.message);
-        results.failed.push({
-          ticketId,
-          error: error.message
-        });
-      }
-    }))
-  );
+  for (const { originalTicketId, duplicateTicketIds } of ticketGroups) {
+    try {
+      const ticketNumber = await fetchTicketNumber(originalTicketId, headers);
+
+      await Promise.all(
+        duplicateTicketIds.map(ticketId => limit(async () => {
+          try {
+            const comment = `#${ticketNumber}`;
+            await addCommentToTicket(ticketId, comment, headers);
+            await axios.patch(
+              `${API_BASE}/tickets/${ticketId}`,
+              { status: "Closed" },
+              { headers }
+            );
+            results.successful.push(ticketId);
+          } catch (error) {
+            console.error(`Failed to close duplicate ${ticketId}:`, error.message);
+            results.failed.push({ ticketId, error: error.message });
+          }
+        }))
+      );
+
+      results.total += duplicateTicketIds.length;
+    } catch (error) {
+      console.error(`Failed to fetch ticketNumber for ${originalTicketId}:`, error.message);
+      results.failed.push({
+        ticketId: originalTicketId,
+        error: `Unable to fetch ticketNumber: ${error.message}`
+      });
+    }
+  }
 
   return results;
 };
