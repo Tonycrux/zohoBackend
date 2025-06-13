@@ -10,7 +10,7 @@ const axios = require("axios");
 
 let csToggle = 0;
 
-const LIVE_MODE = false; 
+const LIVE_MODE = true; 
 
 const AGENT_IDS = {
   cs: ["988907000000774001", "988907000000772035"],
