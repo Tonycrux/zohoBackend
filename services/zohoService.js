@@ -256,3 +256,279 @@ exports.detectAndCloseDuplicateTickets = async (teamIds = [], timeInSeconds) => 
     all: [...originals, ...duplicates]
   };
 };
+
+
+exports.closeDuplicatesForEmail = async ({ timeInSeconds, teamIds }) => {
+  const token = await getAccessToken();
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    orgId: process.env.ORG_ID,
+    "Content-Type": "application/json",
+  };
+
+  const res = await axios.get(`${API_BASE}/tickets`, {
+    headers,
+    params: {
+      status: "Open",
+      teamIds,
+      // limit: 100,
+      include: "contacts",
+    },
+  });
+
+  const now = Date.now();
+  const recent = res.data.data.filter(
+    (t) => (now - new Date(t.createdTime).getTime()) / 1000 <= timeInSeconds
+  );
+
+  console.log("Number of tickets checked", recent.length)
+
+  const grouped = {};
+  for (const t of recent) {
+    const email = t.email || t.contact?.email;
+    if (!email) continue;
+    if (!grouped[email]) grouped[email] = [];
+    grouped[email].push(t);
+  }
+
+  const closed = [];
+  const kept = [];
+
+  for (const email in grouped) {
+    const group = grouped[email].sort((a, b) => new Date(a.createdTime) - new Date(b.createdTime));
+    const [first, ...rest] = group;
+
+    kept.push(first);
+    closed.push(...rest); // just pass the rest, don’t close
+  }
+
+  return {
+    total: recent.length,
+    closed,
+    kept,
+  };
+};
+
+
+
+
+exports.getAllDuplicatesWithDetails = async (teamIds = []) => {
+  const token = await getAccessToken();
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    orgId: process.env.ORG_ID,
+  };
+
+  const baseParams = {
+    status: "Open",
+    include: "contacts,assignee",
+    limit: 100,
+  };
+
+  if (teamIds.length > 0) {
+    baseParams.teamIds = teamIds.join(",");
+  }
+
+  // Paginated ticket fetch
+  const allTickets = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const params = { ...baseParams, from };
+    console.log(`Fetching tickets from index ${from}...`);
+
+    const res = await axios.get(`${API_BASE}/tickets`, { headers, params });
+    const tickets = res.data.data || [];
+
+    console.log(`Fetched ${tickets.length} tickets`);
+    allTickets.push(...tickets);
+
+    hasMore = tickets.length === 100;
+    from += 100;
+  }
+
+  console.log(`Total tickets fetched: ${allTickets.length}`);
+
+  // Enrich with messages
+  const limit = pLimit(5);
+  const enriched = await Promise.all(
+    allTickets.map(t =>
+      limit(async () => {
+        const allContent = await exports.getAllTicketContent(t.id);
+
+        const combinedContent = allContent
+          .filter(msg => msg.type === "Customer Message")
+          .map(msg => msg.content)
+          .join(" ")
+          .toLowerCase()
+          .trim();
+
+        return {
+          id: t.id,
+          subject: t.subject,
+          email: t.email || t.contact?.email || "",
+          createdTime: new Date(t.createdTime),
+          content: combinedContent,
+          messages: allContent,
+        };
+      })
+    )
+  );
+
+  enriched.sort((a, b) => a.createdTime - b.createdTime);
+
+  // Group by email + content
+  const grouped = new Map();
+  for (const ticket of enriched) {
+    const key = `${ticket.email}|${ticket.content}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(ticket);
+  }
+
+  // Build duplicate groups
+  const duplicateGroups = [];
+
+  for (const group of grouped.values()) {
+    if (group.length > 1) {
+      const sortedGroup = group.sort((a, b) => a.createdTime - b.createdTime);
+      const original = sortedGroup[0];
+      const potentialDuplicates = sortedGroup.slice(1);
+
+      const duplicates = potentialDuplicates
+        .filter(dup => dup.id !== original.id)
+        .map(dup => ({
+          ...dup,
+          subject: dup.subject.includes("[DUP]") ? dup.subject : `[DUP] ${dup.subject}`,
+          isDuplicate: true,
+        }));
+
+      if (duplicates.length > 0) {
+        duplicateGroups.push({
+          original: { ...original, isDuplicate: false },
+          duplicates,
+          email: original.email,
+          totalInGroup: 1 + duplicates.length,
+        });
+      }
+    }
+  }
+
+  return {
+    duplicateGroups,
+    headers,
+  };
+};
+
+
+
+exports.getAllTicketContent = async (ticketId) => {
+  const token = await getAccessToken();
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    orgId: process.env.ORG_ID,
+  };
+
+  let threads = [];
+  try {
+    const res = await axios.get(`${API_BASE}/tickets/${ticketId}/threads`, { headers });
+    threads = res.data?.data || [];
+  } catch (err) {
+    console.warn(`Could not fetch thread list for ${ticketId}:`, err.message);
+    return [];
+  }
+
+  if (threads.length === 0) return [];
+
+  // Get all threads (incoming and outgoing), sorted by creation time
+  const allThreads = threads
+    .filter(t => t.channel !== "SYSTEM") // Only remove system messages
+    .sort((a, b) => new Date(a.createdTime) - new Date(b.createdTime));
+
+  // Use pLimit to control concurrent requests for thread details
+  const threadLimit = pLimit(3); // Lower limit for thread detail requests
+
+  const contentPromises = allThreads.map(thread => threadLimit(async () => {
+    try {
+      const detail = await axios.get(
+        `${API_BASE}/tickets/${ticketId}/threads/${thread.id}`,
+        { headers }
+      );
+      const rawContent = detail.data?.content || thread.summary || "";
+      const stripQuotedText = (text) => {
+        return text.split(/(on\s+\w{3},\s+\d{1,2}\s+\w{3,9}\s+\d{4},?.*wrote:)/i)[0]
+                  .split(/----\s+on\s+/i)[0]
+                  .split(/forwarded message:/i)[0]
+                  .trim();
+      };
+
+      const cleanContent = stripQuotedText(stripHtml(rawContent).trim());
+      
+      if (!cleanContent) return null;
+      
+      return {
+        type: thread.direction === "in" ? "Customer Message" : "Tizeti Reply",
+        timestamp: thread.createdTime,
+        content: cleanContent
+      };
+    } catch (err) {
+      console.warn(`Failed to get thread detail for ${thread.id} and ticketId: ${ticketId}:`, err.message);
+      const fallbackContent = thread.summary || "";
+      
+      if (!fallbackContent) return null;
+      
+      return {
+        type: thread.direction === "in" ? "Customer Message" : "Tizeti Reply",
+        timestamp: thread.createdTime,
+        content: fallbackContent.trim()
+      };
+    }
+  }));
+
+  try {
+    const contents = await Promise.all(contentPromises);
+    // Filter out null values and return the structured array
+    return contents.filter(c => c !== null);
+  } catch (err) {
+    console.warn(`Error processing thread contents for ${ticketId}:`, err.message);
+    return [];
+  }
+};
+
+
+exports.closeTicketsByIds = async (ticketIds) => {
+  const token = await getAccessToken();
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${token}`,
+    orgId: process.env.ORG_ID,
+  };
+
+  const results = {
+    successful: [],
+    failed: [],
+    total: ticketIds.length
+  };
+
+  const limit = pLimit(5); // Limit concurrent requests
+
+  await Promise.all(
+    ticketIds.map(ticketId => limit(async () => {
+      try {
+        await axios.patch(
+          `${API_BASE}/tickets/${ticketId}`,
+          { status: "Closed" },
+          { headers }
+        );
+        results.successful.push(ticketId);
+      } catch (error) {
+        console.error(`Failed to close ticket ${ticketId}:`, error.message);
+        results.failed.push({
+          ticketId,
+          error: error.message
+        });
+      }
+    }))
+  );
+
+  return results;
+};

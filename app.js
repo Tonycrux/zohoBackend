@@ -6,6 +6,7 @@ if (process.env.NODE_ENV !== "production") {
 const app = express();
 // const port = process.env.PORT || 3000;
 
+app.use(express.json());
 
 // Routers
 const ticketRoutes = require("./routers/ticketRouters");
@@ -20,4 +21,4 @@ app.get("/", (req, res) => res.send("Zoho Desk API Backend"));
 //   console.log(`Server running on http://localhost:${port}`);
 // });
 
-module.exports = app; // <-- export the app
+module.exports = app; 
